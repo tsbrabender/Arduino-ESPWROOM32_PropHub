@@ -1,0 +1,20 @@
+#pragma once
+
+// DFPlayer Mini SD card layout: folders must be named "01".."99" and contain
+// sequentially numbered files "001.mp3".."NNN.mp3" (DFPlayer's folder+file
+// playback mode). Point each folder below at the SD card directory holding
+// that effect set, and keep *_TRACK_COUNT in sync with how many files are
+// actually in it so random selection stays in range.
+
+// Played by the "default" effect: a random file from this folder.
+#define SOUNDBOX_DEFAULT_FOLDER 1
+#define SOUNDBOX_DEFAULT_TRACK_COUNT 1
+
+// Played by the "alternate" effect: a random file from this folder.
+#define SOUNDBOX_ALTERNATE_FOLDER 2
+#define SOUNDBOX_ALTERNATE_TRACK_COUNT 1
+
+// DFPlayer Mini's volume range is 0-30. "volume-up"/"volume-down" effects
+// step by SOUNDBOX_VOLUME_STEP within that range.
+#define SOUNDBOX_DEFAULT_VOLUME 20
+#define SOUNDBOX_VOLUME_STEP 5

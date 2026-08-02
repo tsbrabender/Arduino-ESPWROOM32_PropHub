@@ -2,5 +2,5 @@
 
 // SSID/password for the Wi-Fi network this device broadcasts (AP mode).
 // Password must be 8+ characters, or "" for an open network.
-#define WIFI_SSID "SoundBox"
+#define WIFI_SSID "PropHub"
 #define WIFI_PASSWORD "your-password"

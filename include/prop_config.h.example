@@ -4,7 +4,12 @@
 // a unique PROP_NAME so it's distinguishable on the hub's dashboard.
 #define PROP_NAME "prop-1"
 
-// Effect names this prop reports as triggerable. The stub /trigger handler
-// doesn't yet differentiate between them - wire in real hardware per effect.
-static const char *PROP_EFFECTS[] = {"default"};
+// Effect names this prop reports as triggerable, shown as buttons on the
+// hub's dashboard. The stub /trigger handler (prop_main.cpp) doesn't
+// differentiate between them - wire in real hardware per effect. The
+// soundbox firmware (prop_soundbox_main.cpp) gives these five specific
+// names meaning: "default"/"alternate" play a random track from their
+// configured SD card folder (see prop_soundbox_config.h), "standby" stops
+// playback, "volume-up"/"volume-down" step the volume.
+static const char *PROP_EFFECTS[] = {"default", "alternate", "standby", "volume-up", "volume-down"};
 #define PROP_EFFECTS_COUNT (sizeof(PROP_EFFECTS) / sizeof(PROP_EFFECTS[0]))

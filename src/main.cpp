@@ -11,7 +11,7 @@
 
 #include "wifi_config.h"
 
-static const char *MDNS_HOSTNAME = "soundbox";
+static const char *MDNS_HOSTNAME = "prophub";
 
 AsyncWebServer server(80);
 

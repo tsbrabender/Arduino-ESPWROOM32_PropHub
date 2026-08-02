@@ -12,21 +12,21 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "C:/Files/SourceCode/tsbrabender/Arduino/Arduino-ESPWROOM32_SoundBox/.pio/build/esp32dev/firmware.elf",
-            "projectEnvName": "esp32dev",
+            "executable": "C:/Files/SourceCode/tsbrabender/Arduino/Arduino-ESPWROOM32_PropHub/.pio/build/prop_hub/firmware.elf",
+            "projectEnvName": "prop_hub",
             "toolchainBinDir": "C:/Users/tsbra/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": {
                 "type": "PlatformIO",
-                "task": "Pre-Debug"
+                "task": "Pre-Debug (prop_hub)"
             }
         },
         {
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "C:/Files/SourceCode/tsbrabender/Arduino/Arduino-ESPWROOM32_SoundBox/.pio/build/esp32dev/firmware.elf",
-            "projectEnvName": "esp32dev",
+            "executable": "C:/Files/SourceCode/tsbrabender/Arduino/Arduino-ESPWROOM32_PropHub/.pio/build/prop_hub/firmware.elf",
+            "projectEnvName": "prop_hub",
             "toolchainBinDir": "C:/Users/tsbra/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart"
         },
@@ -34,8 +34,8 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (without uploading)",
-            "executable": "C:/Files/SourceCode/tsbrabender/Arduino/Arduino-ESPWROOM32_SoundBox/.pio/build/esp32dev/firmware.elf",
-            "projectEnvName": "esp32dev",
+            "executable": "C:/Files/SourceCode/tsbrabender/Arduino/Arduino-ESPWROOM32_PropHub/.pio/build/prop_hub/firmware.elf",
+            "projectEnvName": "prop_hub",
             "toolchainBinDir": "C:/Users/tsbra/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "loadMode": "manual"

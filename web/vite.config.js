@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://soundbox.local',
+      '/api': 'http://prophub.local',
     },
   },
 })

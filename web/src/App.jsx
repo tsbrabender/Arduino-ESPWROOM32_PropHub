@@ -171,7 +171,7 @@ export default function App() {
 
   return (
     <>
-      <h1>SoundBox</h1>
+      <h1>PropHub</h1>
       <p className="subtitle">
         <span className={`status-dot ${error ? 'err' : 'ok'}`} />
         {error ? `Disconnected (${error})` : status ? 'Connected' : 'Loading…'}

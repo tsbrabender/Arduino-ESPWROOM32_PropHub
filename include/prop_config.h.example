@@ -1,0 +1,10 @@
+#pragma once
+
+// Customize this per physical prop before flashing it. Each prop should have
+// a unique PROP_NAME so it's distinguishable on the hub's dashboard.
+#define PROP_NAME "prop-1"
+
+// Effect names this prop reports as triggerable. The stub /trigger handler
+// doesn't yet differentiate between them - wire in real hardware per effect.
+static const char *PROP_EFFECTS[] = {"default"};
+#define PROP_EFFECTS_COUNT (sizeof(PROP_EFFECTS) / sizeof(PROP_EFFECTS[0]))

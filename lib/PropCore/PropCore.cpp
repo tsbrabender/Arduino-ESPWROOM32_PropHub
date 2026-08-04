@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
+#include <stdarg.h>
 
 namespace {
 
@@ -92,4 +93,28 @@ void propCoreLoop() {
     registerWithHub();
     lastHeartbeatMs = millis();
   }
+}
+
+void propCoreLog(const char *fmt, ...) {
+  char buffer[192];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buffer, sizeof(buffer), fmt, args);
+  va_end(args);
+
+  Serial.println(buffer);
+
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  JsonDocument doc;
+  doc["id"] = WiFi.macAddress();
+  doc["message"] = buffer;
+  String body;
+  serializeJson(doc, body);
+
+  HTTPClient http;
+  http.begin(String(HUB_BASE_URL) + "/api/nodes/log");
+  http.addHeader("Content-Type", "application/json");
+  http.POST(body);
+  http.end();
 }

@@ -90,15 +90,32 @@ void handleApiStatus(AsyncWebServerRequest *request) {
 // Prop nodes re-register every PROP_HEARTBEAT_MS (see prop_main.cpp), well under this.
 static const unsigned long NODE_STALE_MS = 15000;
 
+// How many of each node's most recent status messages (see PropCore::propCoreLog)
+// to keep. Oldest entries are dropped once this cap is hit.
+static const size_t MAX_LOG_ENTRIES = 100;
+
+struct LogEntry {
+  unsigned long ts;
+  String message;
+};
+
 struct PropNode {
   String id;
   String name;
   String ip;
   std::vector<String> effects;
   unsigned long lastSeenMs;
+  std::vector<LogEntry> logs;
 };
 
 std::vector<PropNode> propNodes;
+
+PropNode *findPropNode(const String &id) {
+  for (auto &node : propNodes) {
+    if (node.id == id) return &node;
+  }
+  return nullptr;
+}
 
 void handleRegisterNode(AsyncWebServerRequest *request, JsonVariant &json) {
   JsonObject body = json.as<JsonObject>();
@@ -108,13 +125,7 @@ void handleRegisterNode(AsyncWebServerRequest *request, JsonVariant &json) {
     return;
   }
 
-  PropNode *node = nullptr;
-  for (auto &n : propNodes) {
-    if (n.id == id) {
-      node = &n;
-      break;
-    }
-  }
+  PropNode *node = findPropNode(id);
   if (node == nullptr) {
     propNodes.push_back(PropNode{});
     node = &propNodes.back();
@@ -157,6 +168,56 @@ void handleGetNodes(AsyncWebServerRequest *request) {
   request->send(response);
 }
 
+// Status messages a prop sends via PropCore::propCoreLog, kept per-node so
+// they're visible on the dashboard without a serial cable.
+void handleNodeLog(AsyncWebServerRequest *request, JsonVariant &json) {
+  JsonObject body = json.as<JsonObject>();
+  String id = body["id"] | "";
+  String message = body["message"] | "";
+  if (id.isEmpty() || message.isEmpty()) {
+    request->send(400, "application/json", "{\"error\":\"missing id or message\"}");
+    return;
+  }
+
+  PropNode *node = findPropNode(id);
+  if (node == nullptr) {
+    request->send(404, "application/json", "{\"error\":\"unknown node\"}");
+    return;
+  }
+
+  node->logs.push_back(LogEntry{millis(), message});
+  if (node->logs.size() > MAX_LOG_ENTRIES) {
+    node->logs.erase(node->logs.begin());
+  }
+
+  request->send(200, "application/json", "{\"ok\":true}");
+}
+
+void handleGetNodeLogs(AsyncWebServerRequest *request) {
+  if (!request->hasParam("id")) {
+    request->send(400, "application/json", "{\"error\":\"missing id\"}");
+    return;
+  }
+
+  PropNode *node = findPropNode(request->getParam("id")->value());
+  if (node == nullptr) {
+    request->send(404, "application/json", "{\"error\":\"unknown node\"}");
+    return;
+  }
+
+  JsonDocument doc;
+  JsonArray logs = doc["logs"].to<JsonArray>();
+  for (auto &entry : node->logs) {
+    JsonObject e = logs.add<JsonObject>();
+    e["ts"] = entry.ts;
+    e["message"] = entry.message;
+  }
+
+  AsyncResponseStream *response = request->beginResponseStream("application/json");
+  serializeJson(doc, *response);
+  request->send(response);
+}
+
 void startWebServer() {
   if (!LittleFS.begin(true)) {
     Serial.println("Failed to mount LittleFS");
@@ -170,6 +231,8 @@ void startWebServer() {
   server.on("/api/status", HTTP_GET, handleApiStatus);
   server.on("/api/nodes", HTTP_GET, handleGetNodes);
   server.addHandler(new AsyncCallbackJsonWebHandler("/api/nodes/register", handleRegisterNode));
+  server.on("/api/nodes/logs", HTTP_GET, handleGetNodeLogs);
+  server.addHandler(new AsyncCallbackJsonWebHandler("/api/nodes/log", handleNodeLog));
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
   server.begin();
   Serial.println("Web server started");

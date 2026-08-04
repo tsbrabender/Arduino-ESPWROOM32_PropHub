@@ -18,3 +18,16 @@
 // step by SOUNDBOX_VOLUME_STEP within that range.
 #define SOUNDBOX_DEFAULT_VOLUME 20
 #define SOUNDBOX_VOLUME_STEP 5
+
+// "Track finished" detection: the DFPlayer's UART "finished" notification is
+// unreliable on this hardware, so the module's BUSY pin (wired to
+// DFPLAYER_BUSY_PIN, active low while playing) is the primary signal - it's
+// driven directly by the chip, independent of the flaky serial link. Ignore
+// it for this long after a track starts, since BUSY takes a moment to drop
+// low after the play command is sent.
+#define SOUNDBOX_MIN_PLAY_MS 1500UL
+
+// Once BUSY first reads idle (HIGH), require it to keep reading idle for
+// this long before trusting it - guards against a brief/glitchy HIGH read
+// being mistaken for the track actually finishing.
+#define SOUNDBOX_BUSY_CONFIRM_MS 1500UL

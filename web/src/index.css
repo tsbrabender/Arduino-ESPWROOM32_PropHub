@@ -230,3 +230,56 @@ td.state-deleted {
   font-size: 12px;
   opacity: 0.6;
 }
+
+.props-panel {
+  padding: 20px 22px;
+}
+
+.nav-link {
+  display: inline-block;
+  margin-top: 20px;
+  font: inherit;
+  font-size: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  text-decoration: underline;
+}
+
+.prop-logs-link {
+  margin-top: 0;
+  font-size: 13px;
+}
+
+.log-panel {
+  font-family: var(--mono);
+  font-size: 13px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.log-line {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.log-line:last-child {
+  border-bottom: none;
+}
+
+.log-ts {
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.log-message {
+  color: var(--text-h);
+  word-break: break-word;
+}

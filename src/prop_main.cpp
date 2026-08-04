@@ -15,7 +15,7 @@ void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
     effect = json["effect"].as<String>();
   }
 
-  Serial.printf("Triggered effect: %s\n", effect.c_str());
+  propCoreLog("Triggered effect: %s", effect.c_str());
   digitalWrite(LED_PIN, HIGH);
   delay(150);
   digitalWrite(LED_PIN, LOW);

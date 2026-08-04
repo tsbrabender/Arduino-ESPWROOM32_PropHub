@@ -10,3 +10,8 @@ void propCoreBegin(const char *propName, const char *const *effects, size_t effe
                     const char *wifiSsid, const char *wifiPassword,
                     ArJsonRequestHandlerFunction onTrigger);
 void propCoreLoop();
+
+// Prints to Serial as usual, and - if the hub is reachable - forwards the
+// same message to it (POST /api/nodes/log) so it shows up in the prop's log
+// page on the dashboard instead of only being visible over a serial cable.
+void propCoreLog(const char *fmt, ...);

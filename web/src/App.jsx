@@ -70,8 +70,18 @@ function useNodes(intervalMs) {
   return nodes
 }
 
+function shortId(id) {
+  // id is a MAC address like "AA:BB:CC:DD:EE:FF" - show the last two octets
+  // so props with duplicate PROP_NAMEs are still distinguishable.
+  const parts = id.split(':')
+  return parts.slice(-2).join(':')
+}
+
 function PropsPanel({ nodes, onOpenLogs }) {
   const [triggerStatus, setTriggerStatus] = useState({})
+  const [renamingId, setRenamingId] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renameStatus, setRenameStatus] = useState({})
 
   async function trigger(node, effect) {
     const key = `${node.id}:${effect}`
@@ -93,13 +103,66 @@ function PropsPanel({ nodes, onOpenLogs }) {
     }
   }
 
+  function startRename(node) {
+    setRenamingId(node.id)
+    setRenameValue(node.name)
+  }
+
+  async function submitRename(node) {
+    const newName = renameValue.trim()
+    setRenamingId(null)
+    if (!newName || newName === node.name) return
+
+    setRenameStatus((prev) => ({ ...prev, [node.id]: 'saving' }))
+    try {
+      const res = await fetch(`http://${node.ip}/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setRenameStatus((prev) => ({ ...prev, [node.id]: 'saved' }))
+    } catch {
+      setRenameStatus((prev) => ({ ...prev, [node.id]: 'failed' }))
+    } finally {
+      setTimeout(() => {
+        setRenameStatus((prev) => ({ ...prev, [node.id]: undefined }))
+      }, TRIGGER_STATUS_RESET_MS)
+    }
+  }
+
   return (
     <div className="card props-panel">
       {nodes.length === 0 && <p className="subtitle">No prop nodes registered yet.</p>}
       {nodes.map((node) => (
         <div className="prop-row" key={node.id}>
           <span className={`status-dot ${node.online ? 'ok' : 'err'}`} />
-          <span className="prop-name">{node.name}</span>
+          {renamingId === node.id ? (
+            <input
+              className="prop-name-input"
+              value={renameValue}
+              autoFocus
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitRename(node)
+                if (e.key === 'Escape') setRenamingId(null)
+              }}
+              onBlur={() => submitRename(node)}
+            />
+          ) : (
+            <button
+              type="button"
+              className="prop-name prop-name-button"
+              disabled={!node.online}
+              onClick={() => startRename(node)}
+              title="Click to rename"
+            >
+              {node.name}
+              {renameStatus[node.id] === 'saving' && ' …'}
+              {renameStatus[node.id] === 'failed' && ' (rename failed)'}
+            </button>
+          )}
+          <span className="prop-id">#{shortId(node.id)}</span>
           <span className="prop-ip">{node.ip}</span>
           <button type="button" className="nav-link prop-logs-link" onClick={() => onOpenLogs(node)}>
             Logs

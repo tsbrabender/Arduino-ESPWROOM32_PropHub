@@ -1,0 +1,15 @@
+#pragma once
+
+// GPIO pins this prop pulses when triggered. Each entry becomes one
+// "toggle-N" effect on the hub's dashboard (toggle-1 for GPIO_TRIGGER_PINS[0],
+// toggle-2 for GPIO_TRIGGER_PINS[1], etc.) - up to 3 entries are supported.
+// Avoid the ESP8266's boot-strapping pins (GPIO0, GPIO2, GPIO15) and UART
+// pins (GPIO1, GPIO3, used for Serial). Below: GPIO12/GPIO13, silkscreened
+// D6/D7 on NodeMCU/Wemos-style boards.
+static const int GPIO_TRIGGER_PINS[] = {12, 13};
+#define GPIO_TRIGGER_PIN_COUNT (sizeof(GPIO_TRIGGER_PINS) / sizeof(GPIO_TRIGGER_PINS[0]))
+
+// How long each pin stays HIGH when its toggle is pressed (ms) - stub
+// behavior for a momentary relay/solenoid pulse. Swap for real per-hardware
+// logic in handleTrigger() in src/prop_gpio_main.cpp.
+#define GPIO_TRIGGER_PULSE_MS 150

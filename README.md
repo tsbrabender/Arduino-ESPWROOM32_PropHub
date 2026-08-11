@@ -33,6 +33,18 @@ A prop node joins the hub's Wi-Fi network, registers itself (name, IP, effects) 
 
 `wifi_config.h` is shared by every environment, hub included — if you change it, reflash the hub too, or props won't be able to join its (now different) network.
 
+Every prop can also be renamed after the fact from the dashboard (click its name in the Props panel) — the new name is persisted on the device itself (NVS on ESP32, EEPROM on ESP8266) and survives reboots and future reflashes.
+
+## Building a GPIO trigger prop
+
+A stub prop for ESP8266MOD-based boards (`esp12e` pinout) that exposes up to three momentary "toggle" effects — pressing one briefly pulses a GPIO HIGH then LOW, a starting point for relay, solenoid, or similar hardware. Copy `include/prop_gpio_config.h.example` to `include/prop_gpio_config.h` and set `GPIO_TRIGGER_PINS` (1-3 entries) to match your wiring; each entry becomes one `toggle-N` button on the dashboard. Unlike other prop types, `PROP_EFFECTS` in `prop_config.h` isn't used here — only `PROP_NAME` is.
+
+```
+pio run -e prop_gpio --target upload
+```
+
+Everything else (hub join/registration, logging, rename) works the same as any other prop via the shared `PropCore` library — swap the stub pulse logic in `handleTrigger()` in `src/prop_gpio_main.cpp` for real hardware.
+
 ## Troubleshooting
 
 **`pio` isn't recognized as a command** — PlatformIO's CLI often isn't on `PATH` outside the IDE extension's own terminal. Either call it by full path (e.g. `C:\Users\<you>\.platformio\penv\Scripts\pio.exe run -e prop_node --target upload`) or add that `Scripts` folder to your user `PATH` once.

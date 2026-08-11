@@ -10,6 +10,8 @@
 // soundbox firmware (prop_soundbox_main.cpp) gives these five specific
 // names meaning: "default"/"alternate" play a random track from their
 // configured SD card folder (see prop_soundbox_config.h), "standby" stops
-// playback, "volume-up"/"volume-down" step the volume.
+// playback, "volume-up"/"volume-down" step the volume. Not used by the GPIO
+// trigger firmware (prop_gpio_main.cpp) - its "toggle-N" effects are fixed
+// by how many pins are set in prop_gpio_config.h instead.
 static const char *PROP_EFFECTS[] = {"default", "alternate", "standby", "volume-up", "volume-down"};
 #define PROP_EFFECTS_COUNT (sizeof(PROP_EFFECTS) / sizeof(PROP_EFFECTS[0]))

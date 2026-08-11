@@ -1,10 +1,17 @@
 #include "PropCore.h"
 
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <EEPROM.h>
+#else
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
+#endif
+
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
-#include <Preferences.h>
 #include <stdarg.h>
 
 namespace {
@@ -13,11 +20,18 @@ const unsigned long HEARTBEAT_INTERVAL_MS = 5000;
 // The hub always runs its softAP on this address (ESP32 default AP gateway IP).
 const char *HUB_BASE_URL = "http://192.168.4.1";
 
-// NVS namespace/key the prop's (possibly user-renamed) name is persisted
-// under, so it survives reboots and reflashing with new firmware - only a
-// full chip erase clears NVS.
+// Where the prop's (possibly user-renamed) name is persisted, so it survives
+// reboots and reflashing with new firmware. ESP32 uses NVS (Preferences);
+// ESP8266 has no NVS equivalent, so it uses flash-emulated EEPROM instead -
+// only a full chip erase clears either.
+#if defined(ESP32)
 const char *NVS_NAMESPACE = "propcore";
 const char *NVS_KEY_NAME = "name";
+#elif defined(ESP8266)
+// Byte 0 is the stored name's length (0 or 0xFF/255 means "nothing saved
+// yet"), bytes 1..EEPROM_SIZE-1 hold the name itself.
+const int EEPROM_SIZE = 64;
+#endif
 
 AsyncWebServer server(80);
 AsyncCorsMiddleware cors;
@@ -28,6 +42,57 @@ const char *const *g_effects = nullptr;
 size_t g_effectsCount = 0;
 const char *g_wifiSsid = nullptr;
 const char *g_wifiPassword = nullptr;
+
+// ESP8266's HTTPClient requires an explicit WiFiClient; ESP32's doesn't.
+void beginHttp(HTTPClient &http, const String &url) {
+#if defined(ESP8266)
+  static WiFiClient wifiClient;
+  http.begin(wifiClient, url);
+#else
+  http.begin(url);
+#endif
+}
+
+String loadStoredName() {
+#if defined(ESP32)
+  Preferences prefs;
+  prefs.begin(NVS_NAMESPACE, /*readOnly=*/true);
+  String stored = prefs.getString(NVS_KEY_NAME, "");
+  prefs.end();
+  return stored;
+#elif defined(ESP8266)
+  EEPROM.begin(EEPROM_SIZE);
+  uint8_t len = EEPROM.read(0);
+  String stored;
+  if (len > 0 && len <= EEPROM_SIZE - 1) {
+    stored.reserve(len);
+    for (uint8_t i = 0; i < len; i++) {
+      stored += (char)EEPROM.read(1 + i);
+    }
+  }
+  EEPROM.end();
+  return stored;
+#endif
+}
+
+void saveStoredName(const String &name) {
+#if defined(ESP32)
+  Preferences prefs;
+  prefs.begin(NVS_NAMESPACE, /*readOnly=*/false);
+  prefs.putString(NVS_KEY_NAME, name);
+  prefs.end();
+#elif defined(ESP8266)
+  EEPROM.begin(EEPROM_SIZE);
+  size_t nameLen = name.length();
+  uint8_t len = nameLen > (size_t)(EEPROM_SIZE - 1) ? (uint8_t)(EEPROM_SIZE - 1) : (uint8_t)nameLen;
+  EEPROM.write(0, len);
+  for (uint8_t i = 0; i < len; i++) {
+    EEPROM.write(1 + i, name[i]);
+  }
+  EEPROM.commit();
+  EEPROM.end();
+#endif
+}
 
 void joinHub() {
   WiFi.mode(WIFI_STA);
@@ -54,7 +119,7 @@ void registerWithHub() {
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(String(HUB_BASE_URL) + "/api/nodes/register");
+  beginHttp(http, String(HUB_BASE_URL) + "/api/nodes/register");
   http.addHeader("Content-Type", "application/json");
   int status = http.POST(body);
   if (status <= 0) {
@@ -66,10 +131,10 @@ void registerWithHub() {
 }
 
 // User-facing rename, POSTed directly to this prop's IP from the dashboard
-// (see PropLogPage/App.jsx pattern for /trigger). Persists to NVS so the
-// name survives reboots and future reflashes, then immediately re-registers
-// with the hub so the new name shows up without waiting for the next
-// heartbeat.
+// (see PropsPanel in App.jsx for the /trigger-style direct-to-prop pattern).
+// Persists so the name survives reboots and future reflashes, then
+// immediately re-registers with the hub so the new name shows up without
+// waiting for the next heartbeat.
 void handleRename(AsyncWebServerRequest *request, JsonVariant &json) {
   JsonObject body = json.as<JsonObject>();
   String newName = body["name"] | "";
@@ -80,11 +145,7 @@ void handleRename(AsyncWebServerRequest *request, JsonVariant &json) {
   }
 
   g_propName = newName;
-
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, /*readOnly=*/false);
-  prefs.putString(NVS_KEY_NAME, g_propName);
-  prefs.end();
+  saveStoredName(g_propName);
 
   registerWithHub();
 
@@ -101,10 +162,7 @@ void handleRename(AsyncWebServerRequest *request, JsonVariant &json) {
 void propCoreBegin(const char *propName, const char *const *effects, size_t effectsCount,
                     const char *wifiSsid, const char *wifiPassword,
                     ArJsonRequestHandlerFunction onTrigger) {
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, /*readOnly=*/true);
-  String storedName = prefs.getString(NVS_KEY_NAME, "");
-  prefs.end();
+  String storedName = loadStoredName();
   g_propName = storedName.length() > 0 ? storedName : String(propName);
 
   g_effects = effects;
@@ -157,7 +215,7 @@ void propCoreLog(const char *fmt, ...) {
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(String(HUB_BASE_URL) + "/api/nodes/log");
+  beginHttp(http, String(HUB_BASE_URL) + "/api/nodes/log");
   http.addHeader("Content-Type", "application/json");
   http.POST(body);
   http.end();

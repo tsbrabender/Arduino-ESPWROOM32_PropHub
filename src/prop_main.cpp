@@ -6,8 +6,21 @@
 #include "prop_config.h"
 
 static const int LED_PIN = 2;
+static const unsigned long TRIGGER_PULSE_MS = 150;
 
-// Stub trigger handler: logs the requested effect and blinks the onboard LED.
+// Tracks an in-progress LED pulse and a pending log message so loop() - not
+// the request handler - does the blocking work. AsyncWebServer invokes
+// handleTrigger() from inside the TCP stack's own callback context (see
+// prop_gpio_main.cpp), where both delay() and propCoreLog()'s network
+// round-trip would stall the HTTP response - the handler must do zero
+// blocking work.
+bool pulseActive = false;
+unsigned long pulseStartMs = 0;
+bool pendingLog = false;
+String pendingEffect;
+
+// Stub trigger handler: records the requested effect and starts the LED
+// pulse; loop() turns the LED back off and sends the log line.
 // Swap this out for real hardware (audio playback, relay, servo, etc).
 void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
   String effect = PROP_EFFECTS[0];
@@ -15,10 +28,11 @@ void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
     effect = json["effect"].as<String>();
   }
 
-  propCoreLog("Triggered effect: %s", effect.c_str());
   digitalWrite(LED_PIN, HIGH);
-  delay(150);
-  digitalWrite(LED_PIN, LOW);
+  pulseActive = true;
+  pulseStartMs = millis();
+  pendingEffect = effect;
+  pendingLog = true;
 
   JsonDocument response;
   response["ok"] = true;
@@ -36,4 +50,14 @@ void setup() {
 
 void loop() {
   propCoreLoop();
+
+  if (pulseActive && millis() - pulseStartMs >= TRIGGER_PULSE_MS) {
+    digitalWrite(LED_PIN, LOW);
+    pulseActive = false;
+  }
+
+  if (pendingLog) {
+    pendingLog = false;
+    propCoreLog("Triggered effect: %s", pendingEffect.c_str());
+  }
 }

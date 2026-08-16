@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <DFRobotDFPlayerMini.h>
+#include <string.h>
 
 #include "PropCore.h"
 #include "wifi_config.h"
@@ -23,23 +24,51 @@ DFRobotDFPlayerMini dfPlayer;
 bool dfPlayerReady = false;
 int currentVolume = SOUNDBOX_DEFAULT_VOLUME;
 
-// MODE_DEFAULT/MODE_ALTERNATE keep picking new random tracks from their
-// folder as each one finishes (see loop()), until "standby" stops them.
-enum SoundboxMode { MODE_STANDBY, MODE_DEFAULT, MODE_ALTERNATE };
+// Effective per-folder track counts used for random selection. Seeded from
+// the configured constants and, if detectTrackCounts() finds the DFPlayer
+// reports a different (valid) count at boot, overwritten with that instead
+// - see detectTrackCounts() below.
+int defaultTrackCount = SOUNDBOX_DEFAULT_TRACK_COUNT;
+int alternateTrackCount = SOUNDBOX_ALTERNATE_TRACK_COUNT;
+int alternate2TrackCount = SOUNDBOX_ALTERNATE2_TRACK_COUNT;
+int alternate3TrackCount = SOUNDBOX_ALTERNATE3_TRACK_COUNT;
+
+// MODE_DEFAULT/MODE_ALTERNATE/MODE_ALTERNATE2/MODE_ALTERNATE3 keep picking
+// new random tracks from their folder as each one finishes (see loop()),
+// until "standby" stops them.
+enum SoundboxMode { MODE_STANDBY, MODE_DEFAULT, MODE_ALTERNATE, MODE_ALTERNATE2, MODE_ALTERNATE3 };
 SoundboxMode currentMode = MODE_STANDBY;
 unsigned long trackStartMs = 0;
 unsigned long busyIdleSinceMs = 0; // 0 = not currently observed idle
+
+// AsyncWebServer invokes handleTrigger() from inside the TCP stack's own
+// callback context (see prop_gpio_main.cpp), where propCoreLog()'s network
+// round-trip would stall the HTTP response - the handler must do zero
+// blocking work. playRandomFromFolder()/setVolume()/handleTrigger() run from
+// both that context and from loop() (track-finished advance), so they always
+// queue through here instead of calling propCoreLog() directly; loop() sends
+// the queued message.
+char pendingLogMessage[192];
+bool pendingLogPresent = false;
+
+void queueLog(const char *message) {
+  strncpy(pendingLogMessage, message, sizeof(pendingLogMessage) - 1);
+  pendingLogMessage[sizeof(pendingLogMessage) - 1] = '\0';
+  pendingLogPresent = true;
+}
 
 // Picks a random file (1..trackCount) from a folder and plays it. Folder
 // playback requires the SD card to have a "01".."99" style directory with
 // sequentially numbered "001.mp3".."NNN.mp3" files - see prop_soundbox_config.h.
 void playRandomFromFolder(int folder, int trackCount) {
   if (!dfPlayerReady) {
-    propCoreLog("DFPlayer not ready - skipping playback");
+    queueLog("DFPlayer not ready - skipping playback");
     return;
   }
   int track = random(1, trackCount + 1);
-  propCoreLog("Playing folder %d track %d", folder, track);
+  char message[64];
+  snprintf(message, sizeof(message), "Playing folder %d track %d", folder, track);
+  queueLog(message);
   dfPlayer.playFolder(folder, track);
   trackStartMs = millis();
   busyIdleSinceMs = 0;
@@ -51,9 +80,13 @@ void playRandomFromFolder(int folder, int trackCount) {
 // playing random tracks back-to-back instead of stopping after one.
 void playForMode(SoundboxMode mode) {
   if (mode == MODE_DEFAULT) {
-    playRandomFromFolder(SOUNDBOX_DEFAULT_FOLDER, SOUNDBOX_DEFAULT_TRACK_COUNT);
+    playRandomFromFolder(SOUNDBOX_DEFAULT_FOLDER, defaultTrackCount);
   } else if (mode == MODE_ALTERNATE) {
-    playRandomFromFolder(SOUNDBOX_ALTERNATE_FOLDER, SOUNDBOX_ALTERNATE_TRACK_COUNT);
+    playRandomFromFolder(SOUNDBOX_ALTERNATE_FOLDER, alternateTrackCount);
+  } else if (mode == MODE_ALTERNATE2) {
+    playRandomFromFolder(SOUNDBOX_ALTERNATE2_FOLDER, alternate2TrackCount);
+  } else if (mode == MODE_ALTERNATE3) {
+    playRandomFromFolder(SOUNDBOX_ALTERNATE3_FOLDER, alternate3TrackCount);
   }
 }
 
@@ -62,13 +95,15 @@ void setVolume(int volume) {
   if (dfPlayerReady) {
     dfPlayer.volume(currentVolume);
   }
-  propCoreLog("Volume set to %d", currentVolume);
+  char message[32];
+  snprintf(message, sizeof(message), "Volume set to %d", currentVolume);
+  queueLog(message);
 }
 
 // Effect names are interpreted here (see prop_config.h.example for the full
-// list): "default"/"alternate" play a random track from their configured
-// folder, "standby" stops playback, "volume-up"/"volume-down" step the
-// volume. Anything else falls back to "default".
+// list): "default"/"alternate"/"alternate2"/"alternate3" play a random track
+// from their configured folder, "standby" stops playback, "volume-up"/
+// "volume-down" step the volume. Anything else falls back to "default".
 void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
   String effect = "default";
   if (json.is<JsonObject>() && json["effect"].is<const char *>()) {
@@ -76,7 +111,7 @@ void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
   }
 
   if (effect == "standby") {
-    propCoreLog("Standby: stopping playback");
+    queueLog("Standby: stopping playback");
     currentMode = MODE_STANDBY;
     if (dfPlayerReady) dfPlayer.stop();
   } else if (effect == "volume-up") {
@@ -85,6 +120,12 @@ void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
     setVolume(currentVolume - SOUNDBOX_VOLUME_STEP);
   } else if (effect == "alternate") {
     currentMode = MODE_ALTERNATE;
+    playForMode(currentMode);
+  } else if (effect == "alternate2") {
+    currentMode = MODE_ALTERNATE2;
+    playForMode(currentMode);
+  } else if (effect == "alternate3") {
+    currentMode = MODE_ALTERNATE3;
     playForMode(currentMode);
   } else {
     effect = "default";
@@ -102,9 +143,30 @@ void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
   request->send(200, "application/json", body);
 }
 
+// Queries the DFPlayer for how many files it sees in `folder` (blocking
+// UART round-trip, ~500ms timeout per the library default) - only safe to
+// call from setup(), never from handleTrigger(). Falls back to
+// `configuredCount` if the module doesn't answer or reports nothing, since
+// the UART link on this hardware is already known to be unreliable (see the
+// init retry loop and the BUSY-pin-over-UART-notification comments below).
+int detectTrackCount(int folder, int configuredCount, const char *label) {
+  int detected = dfPlayer.readFileCountsInFolder(folder);
+  if (detected <= 0) {
+    propCoreLog("Folder %d (%s): count query failed, using configured %d", folder, label, configuredCount);
+    return configuredCount;
+  }
+  if (detected != configuredCount) {
+    propCoreLog("Folder %d (%s): detected %d tracks (configured %d), using detected", folder, label, detected, configuredCount);
+  } else {
+    propCoreLog("Folder %d (%s): detected %d tracks, matches configured", folder, label, detected);
+  }
+  return detected;
+}
+
 void setup() {
   Serial.begin(115200);
   randomSeed(esp_random());
+
   pinMode(DFPLAYER_BUSY_PIN, INPUT_PULLUP);
 
   // Join the hub and register first, before the (potentially slow, up to 5
@@ -134,6 +196,11 @@ void setup() {
   if (dfPlayerReady) {
     dfPlayer.volume(currentVolume);
     propCoreLog("DFPlayer Mini ready");
+
+    defaultTrackCount = detectTrackCount(SOUNDBOX_DEFAULT_FOLDER, SOUNDBOX_DEFAULT_TRACK_COUNT, "default");
+    alternateTrackCount = detectTrackCount(SOUNDBOX_ALTERNATE_FOLDER, SOUNDBOX_ALTERNATE_TRACK_COUNT, "alternate");
+    alternate2TrackCount = detectTrackCount(SOUNDBOX_ALTERNATE2_FOLDER, SOUNDBOX_ALTERNATE2_TRACK_COUNT, "alternate2");
+    alternate3TrackCount = detectTrackCount(SOUNDBOX_ALTERNATE3_FOLDER, SOUNDBOX_ALTERNATE3_TRACK_COUNT, "alternate3");
   } else {
     propCoreLog("DFPlayer Mini not detected - continuing without audio playback");
   }
@@ -141,6 +208,11 @@ void setup() {
 
 void loop() {
   propCoreLoop();
+
+  if (pendingLogPresent) {
+    pendingLogPresent = false;
+    propCoreLog("%s", pendingLogMessage);
+  }
 
   bool trackFinished = false;
   bool canAdvance = dfPlayerReady && currentMode != MODE_STANDBY;

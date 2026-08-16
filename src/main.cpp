@@ -99,11 +99,24 @@ struct LogEntry {
   String message;
 };
 
+// id is the canonical trigger name a prop's onTrigger handler dispatches on
+// (what POST /trigger actually sends) and never changes; label is the
+// possibly user-renamed display text (see PropCore.h's
+// POST /trigger-events/rename) shown on the dashboard instead.
+struct TriggerEvent {
+  String id;
+  String label;
+};
+
 struct PropNode {
   String id;
   String name;
   String ip;
-  std::vector<String> effects;
+  // triggerEvents fire an effect (play a sound, pulse a GPIO) and can be
+  // renamed for display; eventConfigs alter/configure prop state instead
+  // (volume, standby) and can't be renamed - see PropCore.h.
+  std::vector<TriggerEvent> triggerEvents;
+  std::vector<String> eventConfigs;
   unsigned long lastSeenMs;
   std::vector<LogEntry> logs;
 };
@@ -135,10 +148,19 @@ void handleRegisterNode(AsyncWebServerRequest *request, JsonVariant &json) {
 
   node->name = body["name"] | id;
   node->ip = body["ip"] | "";
-  node->effects.clear();
-  if (body["effects"].is<JsonArray>()) {
-    for (JsonVariant effect : body["effects"].as<JsonArray>()) {
-      node->effects.push_back(effect.as<String>());
+  node->triggerEvents.clear();
+  if (body["triggerEvents"].is<JsonArray>()) {
+    for (JsonVariant event : body["triggerEvents"].as<JsonArray>()) {
+      JsonObject eventObj = event.as<JsonObject>();
+      String eventId = eventObj["id"] | "";
+      if (eventId.isEmpty()) continue;
+      node->triggerEvents.push_back(TriggerEvent{eventId, eventObj["label"] | eventId});
+    }
+  }
+  node->eventConfigs.clear();
+  if (body["eventConfigs"].is<JsonArray>()) {
+    for (JsonVariant config : body["eventConfigs"].as<JsonArray>()) {
+      node->eventConfigs.push_back(config.as<String>());
     }
   }
   node->lastSeenMs = millis();
@@ -157,9 +179,15 @@ void handleGetNodes(AsyncWebServerRequest *request) {
     node["name"] = n.name;
     node["ip"] = n.ip;
     node["online"] = (now - n.lastSeenMs) < NODE_STALE_MS;
-    JsonArray effects = node["effects"].to<JsonArray>();
-    for (auto &e : n.effects) {
-      effects.add(e);
+    JsonArray triggerEvents = node["triggerEvents"].to<JsonArray>();
+    for (auto &e : n.triggerEvents) {
+      JsonObject event = triggerEvents.add<JsonObject>();
+      event["id"] = e.id;
+      event["label"] = e.label;
+    }
+    JsonArray eventConfigs = node["eventConfigs"].to<JsonArray>();
+    for (auto &c : n.eventConfigs) {
+      eventConfigs.add(c);
     }
   }
 

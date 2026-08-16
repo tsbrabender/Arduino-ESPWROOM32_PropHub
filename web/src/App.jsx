@@ -82,15 +82,20 @@ function PropsPanel({ nodes, onOpenLogs }) {
   const [renamingId, setRenamingId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
   const [renameStatus, setRenameStatus] = useState({})
+  const [renamingTrigger, setRenamingTrigger] = useState(null) // { nodeId, triggerId } | null
+  const [triggerRenameValue, setTriggerRenameValue] = useState('')
+  const [triggerRenameStatus, setTriggerRenameStatus] = useState({})
 
-  async function trigger(node, effect) {
-    const key = `${node.id}:${effect}`
+  // id is the canonical trigger name sent in the request body; label is
+  // what's shown on the button (possibly renamed - see triggerEventButtons).
+  async function trigger(node, id) {
+    const key = `${node.id}:${id}`
     setTriggerStatus((prev) => ({ ...prev, [key]: 'sending' }))
     try {
       const res = await fetch(`http://${node.ip}/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ effect }),
+        body: JSON.stringify({ effect: id }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setTriggerStatus((prev) => ({ ...prev, [key]: 'sent' }))
@@ -101,6 +106,102 @@ function PropsPanel({ nodes, onOpenLogs }) {
         setTriggerStatus((prev) => ({ ...prev, [key]: undefined }))
       }, TRIGGER_STATUS_RESET_MS)
     }
+  }
+
+  // Renders one trigger button. TriggerEvents and EventConfigs both fire the
+  // same POST /trigger {"effect": id} request (see PropCore.h) - the only
+  // difference here is which group they're shown in and how they're styled,
+  // so operators can tell "do something" apart from "change how it behaves"
+  // at a glance. label is what's displayed; id is always what's sent.
+  function triggerButton(node, id, label, className) {
+    const status = triggerStatus[`${node.id}:${id}`]
+    return (
+      <button
+        key={id}
+        type="button"
+        className={className}
+        disabled={!node.online || status === 'sending'}
+        onClick={() => trigger(node, id)}
+      >
+        {status === 'sending' ? 'Sending…' : status === 'sent' ? 'Triggered ✓' : status === 'failed' ? 'Failed ✗' : label}
+      </button>
+    )
+  }
+
+  function startTriggerRename(node, triggerEvent) {
+    setRenamingTrigger({ nodeId: node.id, triggerId: triggerEvent.id })
+    setTriggerRenameValue(triggerEvent.label)
+  }
+
+  // POSTs directly to the prop (same direct-to-prop pattern as
+  // submitRename() below) so the new label is persisted on-device and
+  // survives reboots/reflashes - see PropCore.h's
+  // POST /trigger-events/rename. A blank label reverts to the canonical id.
+  async function submitTriggerRename(node, triggerEvent) {
+    const newLabel = triggerRenameValue.trim()
+    setRenamingTrigger(null)
+    if (newLabel === triggerEvent.label) return
+
+    const key = `${node.id}:${triggerEvent.id}`
+    setTriggerRenameStatus((prev) => ({ ...prev, [key]: 'saving' }))
+    try {
+      const res = await fetch(`http://${node.ip}/trigger-events/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: triggerEvent.id, label: newLabel }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setTriggerRenameStatus((prev) => ({ ...prev, [key]: 'saved' }))
+    } catch {
+      setTriggerRenameStatus((prev) => ({ ...prev, [key]: 'failed' }))
+    } finally {
+      setTimeout(() => {
+        setTriggerRenameStatus((prev) => ({ ...prev, [key]: undefined }))
+      }, TRIGGER_STATUS_RESET_MS)
+    }
+  }
+
+  // TriggerEvents get a small rename pencil next to the trigger button
+  // itself (clicking the button fires it, so renaming needs its own
+  // affordance) - EventConfigs aren't renameable, so they skip all of this
+  // and just render a plain triggerButton in the caller below.
+  function triggerEventButtons(node) {
+    return node.triggerEvents.map((triggerEvent) => {
+      const isRenaming =
+        renamingTrigger?.nodeId === node.id && renamingTrigger?.triggerId === triggerEvent.id
+      if (isRenaming) {
+        return (
+          <input
+            key={triggerEvent.id}
+            className="prop-name-input trigger-rename-input"
+            value={triggerRenameValue}
+            autoFocus
+            onChange={(e) => setTriggerRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitTriggerRename(node, triggerEvent)
+              if (e.key === 'Escape') setRenamingTrigger(null)
+            }}
+            onBlur={() => submitTriggerRename(node, triggerEvent)}
+          />
+        )
+      }
+
+      const renameState = triggerRenameStatus[`${node.id}:${triggerEvent.id}`]
+      return (
+        <span className="trigger-event-wrap" key={triggerEvent.id}>
+          {triggerButton(node, triggerEvent.id, triggerEvent.label, 'trigger-event-btn')}
+          <button
+            type="button"
+            className="trigger-rename-btn"
+            title={`Rename "${triggerEvent.label}"`}
+            disabled={!node.online}
+            onClick={() => startTriggerRename(node, triggerEvent)}
+          >
+            {renameState === 'saving' ? '…' : renameState === 'failed' ? '✗' : '✎'}
+          </button>
+        </span>
+      )
+    })
   }
 
   function startRename(node) {
@@ -167,21 +268,12 @@ function PropsPanel({ nodes, onOpenLogs }) {
           <button type="button" className="nav-link prop-logs-link" onClick={() => onOpenLogs(node)}>
             Logs
           </button>
-          <span className="prop-actions">
-            {node.effects.map((effect) => {
-              const status = triggerStatus[`${node.id}:${effect}`]
-              return (
-                <button
-                  key={effect}
-                  type="button"
-                  disabled={!node.online || status === 'sending'}
-                  onClick={() => trigger(node, effect)}
-                >
-                  {status === 'sending' ? 'Sending…' : status === 'sent' ? 'Triggered ✓' : status === 'failed' ? 'Failed ✗' : effect}
-                </button>
-              )
-            })}
-          </span>
+          <span className="prop-actions">{triggerEventButtons(node)}</span>
+          {node.eventConfigs.length > 0 && (
+            <span className="prop-actions prop-actions-config">
+              {node.eventConfigs.map((name) => triggerButton(node, name, name, 'event-config-btn'))}
+            </span>
+          )}
         </div>
       ))}
     </div>

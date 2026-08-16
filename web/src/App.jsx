@@ -103,6 +103,26 @@ function PropsPanel({ nodes, onOpenLogs }) {
     }
   }
 
+  // Renders one trigger button. TriggerEvents and EventConfigs both fire the
+  // same POST /trigger {"effect": name} request (see PropCore.h) - the only
+  // difference here is which group they're shown in and how they're styled,
+  // so operators can tell "do something" apart from "change how it behaves"
+  // at a glance.
+  function triggerButton(node, name, className) {
+    const status = triggerStatus[`${node.id}:${name}`]
+    return (
+      <button
+        key={name}
+        type="button"
+        className={className}
+        disabled={!node.online || status === 'sending'}
+        onClick={() => trigger(node, name)}
+      >
+        {status === 'sending' ? 'Sending…' : status === 'sent' ? 'Triggered ✓' : status === 'failed' ? 'Failed ✗' : name}
+      </button>
+    )
+  }
+
   function startRename(node) {
     setRenamingId(node.id)
     setRenameValue(node.name)
@@ -168,20 +188,13 @@ function PropsPanel({ nodes, onOpenLogs }) {
             Logs
           </button>
           <span className="prop-actions">
-            {node.effects.map((effect) => {
-              const status = triggerStatus[`${node.id}:${effect}`]
-              return (
-                <button
-                  key={effect}
-                  type="button"
-                  disabled={!node.online || status === 'sending'}
-                  onClick={() => trigger(node, effect)}
-                >
-                  {status === 'sending' ? 'Sending…' : status === 'sent' ? 'Triggered ✓' : status === 'failed' ? 'Failed ✗' : effect}
-                </button>
-              )
-            })}
+            {node.triggerEvents.map((name) => triggerButton(node, name, 'trigger-event-btn'))}
           </span>
+          {node.eventConfigs.length > 0 && (
+            <span className="prop-actions prop-actions-config">
+              {node.eventConfigs.map((name) => triggerButton(node, name, 'event-config-btn'))}
+            </span>
+          )}
         </div>
       ))}
     </div>

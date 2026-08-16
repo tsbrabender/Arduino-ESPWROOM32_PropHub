@@ -23,7 +23,7 @@ String pendingEffect;
 // pulse; loop() turns the LED back off and sends the log line.
 // Swap this out for real hardware (audio playback, relay, servo, etc).
 void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
-  String effect = PROP_EFFECTS[0];
+  String effect = PROP_TRIGGER_EVENTS[0];
   if (json.is<JsonObject>() && json["effect"].is<const char *>()) {
     effect = json["effect"].as<String>();
   }
@@ -45,7 +45,8 @@ void handleTrigger(AsyncWebServerRequest *request, JsonVariant &json) {
 void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
-  propCoreBegin(PROP_NAME, PROP_EFFECTS, PROP_EFFECTS_COUNT, WIFI_SSID, WIFI_PASSWORD, handleTrigger);
+  propCoreBegin(PROP_NAME, PROP_TRIGGER_EVENTS, PROP_TRIGGER_EVENTS_COUNT,
+                PROP_EVENT_CONFIGS, PROP_EVENT_CONFIGS_COUNT, WIFI_SSID, WIFI_PASSWORD, handleTrigger);
 }
 
 void loop() {

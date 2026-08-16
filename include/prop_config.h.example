@@ -4,14 +4,22 @@
 // a unique PROP_NAME so it's distinguishable on the hub's dashboard.
 #define PROP_NAME "prop-1"
 
-// Effect names this prop reports as triggerable, shown as buttons on the
-// hub's dashboard. The stub /trigger handler (prop_main.cpp) doesn't
-// differentiate between them - wire in real hardware per effect. The
-// soundbox firmware (prop_soundbox_main.cpp) gives these five specific
-// names meaning: "default"/"alternate" play a random track from their
-// configured SD card folder (see prop_soundbox_config.h), "standby" stops
-// playback, "volume-up"/"volume-down" step the volume. Not used by the GPIO
-// trigger firmware (prop_gpio_main.cpp) - its "toggle-N" effects are fixed
-// by how many pins are set in prop_gpio_config.h instead.
-static const char *PROP_EFFECTS[] = {"default", "alternate", "standby", "volume-up", "volume-down"};
-#define PROP_EFFECTS_COUNT (sizeof(PROP_EFFECTS) / sizeof(PROP_EFFECTS[0]))
+// Trigger names this prop reports as triggerable, shown as buttons on the
+// hub's dashboard - split into the two categories PropCore.h documents:
+//   - PROP_TRIGGER_EVENTS: fires an effect. The stub /trigger handler
+//     (prop_main.cpp) doesn't differentiate between them - wire in real
+//     hardware per effect. The soundbox firmware (prop_soundbox_main.cpp)
+//     plays a random track from the matching SD card folder (see
+//     prop_soundbox_config.h) for "default"/"alternate"/"alternate2"/
+//     "alternate3".
+//   - PROP_EVENT_CONFIGS: alters/configures prop state instead of firing an
+//     effect. The soundbox firmware uses "standby" to stop playback and
+//     "volume-up"/"volume-down" to step the volume.
+// Neither is used by the GPIO trigger firmware (prop_gpio_main.cpp) - its
+// "toggle-N" trigger events are fixed by how many pins are set in
+// prop_gpio_config.h instead, and it has no event configs.
+static const char *PROP_TRIGGER_EVENTS[] = {"default", "alternate"};
+#define PROP_TRIGGER_EVENTS_COUNT (sizeof(PROP_TRIGGER_EVENTS) / sizeof(PROP_TRIGGER_EVENTS[0]))
+
+static const char *PROP_EVENT_CONFIGS[] = {"standby", "volume-up", "volume-down"};
+#define PROP_EVENT_CONFIGS_COUNT (sizeof(PROP_EVENT_CONFIGS) / sizeof(PROP_EVENT_CONFIGS[0]))

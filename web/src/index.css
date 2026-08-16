@@ -253,6 +253,20 @@ td.state-deleted {
   cursor: not-allowed;
 }
 
+/* EventConfigs (volume, standby, ...) sit in their own group, set off from
+   the TriggerEvents (play sound, pulse GPIO, ...) group by a dashed divider
+   and dashed buttons - see PropCore.h for the TriggerEvents/EventConfigs
+   split. */
+.prop-actions-config {
+  margin-left: 0;
+  padding-left: 10px;
+  border-left: 1px dashed var(--border);
+}
+
+button.event-config-btn {
+  border-style: dashed;
+}
+
 .error-banner {
   background: var(--card-bg);
   border: 1px solid var(--err);

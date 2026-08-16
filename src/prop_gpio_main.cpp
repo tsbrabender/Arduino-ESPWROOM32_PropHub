@@ -9,10 +9,12 @@
 static_assert(GPIO_TRIGGER_PIN_COUNT >= 1 && GPIO_TRIGGER_PIN_COUNT <= 3,
               "prop_gpio supports 1-3 GPIO_TRIGGER_PINS entries (one per toggle)");
 
-// One "toggle-N" effect per configured GPIO_TRIGGER_PINS entry - unlike
-// other prop types, these are fixed here rather than read from
-// prop_config.h's PROP_EFFECTS, since this prop's effects are intrinsically
-// tied to how many GPIOs are wired up, not freely nameable.
+// One "toggle-N" trigger event per configured GPIO_TRIGGER_PINS entry -
+// unlike other prop types, these are fixed here rather than read from
+// prop_config.h's PROP_TRIGGER_EVENTS, since this prop's effects are
+// intrinsically tied to how many GPIOs are wired up, not freely nameable.
+// All of them fire an effect (pulse a GPIO), so this prop has no
+// EventConfigs - see PropCore.h for the TriggerEvents/EventConfigs split.
 static const char *TOGGLE_EFFECTS[] = {"toggle-1", "toggle-2", "toggle-3"};
 
 // Tracks an in-progress pulse per pin so loop() - not the request handler -
@@ -66,7 +68,8 @@ void setup() {
     pinMode(GPIO_TRIGGER_PINS[i], OUTPUT);
     digitalWrite(GPIO_TRIGGER_PINS[i], LOW);
   }
-  propCoreBegin(PROP_NAME, TOGGLE_EFFECTS, GPIO_TRIGGER_PIN_COUNT, WIFI_SSID, WIFI_PASSWORD, handleTrigger);
+  propCoreBegin(PROP_NAME, TOGGLE_EFFECTS, GPIO_TRIGGER_PIN_COUNT,
+                nullptr, 0, WIFI_SSID, WIFI_PASSWORD, handleTrigger);
 }
 
 void loop() {

@@ -38,8 +38,10 @@ AsyncCorsMiddleware cors;
 unsigned long lastHeartbeatMs = 0;
 
 String g_propName;
-const char *const *g_effects = nullptr;
-size_t g_effectsCount = 0;
+const char *const *g_triggerEvents = nullptr;
+size_t g_triggerEventsCount = 0;
+const char *const *g_eventConfigs = nullptr;
+size_t g_eventConfigsCount = 0;
 const char *g_wifiSsid = nullptr;
 const char *g_wifiPassword = nullptr;
 
@@ -111,9 +113,13 @@ void registerWithHub() {
   doc["id"] = WiFi.macAddress();
   doc["name"] = g_propName;
   doc["ip"] = WiFi.localIP().toString();
-  JsonArray effects = doc["effects"].to<JsonArray>();
-  for (size_t i = 0; i < g_effectsCount; i++) {
-    effects.add(g_effects[i]);
+  JsonArray triggerEvents = doc["triggerEvents"].to<JsonArray>();
+  for (size_t i = 0; i < g_triggerEventsCount; i++) {
+    triggerEvents.add(g_triggerEvents[i]);
+  }
+  JsonArray eventConfigs = doc["eventConfigs"].to<JsonArray>();
+  for (size_t i = 0; i < g_eventConfigsCount; i++) {
+    eventConfigs.add(g_eventConfigs[i]);
   }
   String body;
   serializeJson(doc, body);
@@ -159,14 +165,18 @@ void handleRename(AsyncWebServerRequest *request, JsonVariant &json) {
 
 } // namespace
 
-void propCoreBegin(const char *propName, const char *const *effects, size_t effectsCount,
+void propCoreBegin(const char *propName,
+                    const char *const *triggerEvents, size_t triggerEventsCount,
+                    const char *const *eventConfigs, size_t eventConfigsCount,
                     const char *wifiSsid, const char *wifiPassword,
                     ArJsonRequestHandlerFunction onTrigger) {
   String storedName = loadStoredName();
   g_propName = storedName.length() > 0 ? storedName : String(propName);
 
-  g_effects = effects;
-  g_effectsCount = effectsCount;
+  g_triggerEvents = triggerEvents;
+  g_triggerEventsCount = triggerEventsCount;
+  g_eventConfigs = eventConfigs;
+  g_eventConfigsCount = eventConfigsCount;
   g_wifiSsid = wifiSsid;
   g_wifiPassword = wifiPassword;
 

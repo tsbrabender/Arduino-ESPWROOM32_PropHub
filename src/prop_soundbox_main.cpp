@@ -173,7 +173,8 @@ void setup() {
   // minutes below) DFPlayer handshake - so the prop shows up on the
   // dashboard immediately regardless of how long DFPlayer init takes, and so
   // propCoreLog() can already reach the hub while DFPlayer init is running.
-  propCoreBegin(PROP_NAME, PROP_EFFECTS, PROP_EFFECTS_COUNT, WIFI_SSID, WIFI_PASSWORD, handleTrigger);
+  propCoreBegin(PROP_NAME, PROP_TRIGGER_EVENTS, PROP_TRIGGER_EVENTS_COUNT,
+                PROP_EVENT_CONFIGS, PROP_EVENT_CONFIGS_COUNT, WIFI_SSID, WIFI_PASSWORD, handleTrigger);
 
   Serial2.begin(9600, SERIAL_8N1, DFPLAYER_RX_PIN, DFPLAYER_TX_PIN);
   delay(1500); // DFPlayer Mini needs time to boot before it'll ACK the init handshake

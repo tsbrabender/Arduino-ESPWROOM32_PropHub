@@ -267,6 +267,41 @@ button.event-config-btn {
   border-style: dashed;
 }
 
+/* Each TriggerEvent button gets a small rename pencil next to it - clicking
+   the button itself fires the effect, so renaming needs its own control. */
+.trigger-event-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.trigger-rename-btn {
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.trigger-rename-btn:hover:not(:disabled) {
+  color: var(--text-h);
+  border-color: var(--accent);
+}
+
+.trigger-rename-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.trigger-rename-input {
+  font-size: 13px;
+  padding: 4px 8px;
+  min-width: 110px;
+}
+
 .error-banner {
   background: var(--card-bg);
   border: 1px solid var(--err);

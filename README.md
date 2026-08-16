@@ -9,7 +9,9 @@ Every trigger name a prop reports to the hub falls into one of two categories, b
 - **TriggerEvents** — fires an effect: play a sound, pulse a GPIO, etc. (`default`/`alternate`/`alternate2`/`alternate3` on the soundbox prop, `toggle-N` on the GPIO prop).
 - **EventConfigs** — alters/configures the prop's state instead of firing an effect (`standby`, `volume-up`, `volume-down` on the soundbox prop).
 
-Each prop passes both lists to `propCoreBegin()` (see `lib/PropCore/PropCore.h`) and reports them to the hub as separate `triggerEvents`/`eventConfigs` arrays on registration. The dashboard's Props panel renders them as two visually distinct button groups per prop, with EventConfigs set off by a dashed divider, so at a glance you can tell "do something" buttons apart from "change how it behaves" ones. A prop with no configs (like the GPIO prop) just reports an empty EventConfigs list.
+Each prop passes both lists to `propCoreBegin()` (see `lib/PropCore/PropCore.h`) and reports them to the hub on registration. The dashboard's Props panel renders them as two visually distinct button groups per prop, with EventConfigs set off by a dashed divider, so at a glance you can tell "do something" buttons apart from "change how it behaves" ones. A prop with no configs (like the GPIO prop) just reports an empty EventConfigs list.
+
+TriggerEvents also carry a separate **display label**, editable from the dashboard, distinct from their canonical id (what's actually sent in the `POST /trigger` request and what a prop's `handleTrigger()` dispatches on). Click the pencil next to a TriggerEvent button in the Props panel to rename it — e.g. rename the soundbox's `default` TriggerEvent to "Crickets" without touching what's actually wired up in firmware. The label is persisted on the device itself (NVS on ESP32, EEPROM on ESP8266, via `POST /trigger-events/rename`) and survives reboots and future reflashes; clearing it back to blank reverts to the canonical id. EventConfigs aren't renameable — their names are fixed protocol, not cosmetic.
 
 ## Wi-Fi credentials
 
